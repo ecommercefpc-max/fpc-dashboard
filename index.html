@@ -1648,7 +1648,7 @@ function syncViaJsonp() {
 
   script.onerror = () => { clearTimeout(timer); fail('No se pudo conectar a Google Sheets'); };
   script.src = 'https://docs.google.com/spreadsheets/d/1d4OZhsKmN8gaUMgbXfJiCsTkCTOV18Z_PQJ0truYtSI'
-             + '/gviz/tq?tqx=out:json&sheet=Form_Responses1&callback=' + cbName
+             + '/gviz/tq?sheet=Form_Responses1&headers=1&callback=' + cbName
              + '&headers=1&t=' + Date.now();
   document.head.appendChild(script);
 }
