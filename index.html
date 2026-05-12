@@ -483,6 +483,7 @@ td.hi { color: var(--teal); font-weight: 500; }
         <span id="syncIcon">☁</span> Sincronizar Google Sheets
       </button>
       <div class="upload-status" id="uploadStatus">Conectando...</div>
+      <div id="debugPanel" style="font-size:10px;color:#aaa;margin-top:4px;word-break:break-all"></div>
       <div class="sheets-divider"><span>o</span></div>
       <input type="file" id="excelInput" accept=".xlsx,.xls" style="display:none">
       <input id="scriptUrlInput" style="display:none">
@@ -1611,7 +1612,10 @@ function syncFromSheets() {
     .then(r => { clearTimeout(timer); if(!r.ok) throw new Error('HTTP '+r.status); return r.text(); })
     .then(csv => {
       const result = Papa.parse(csv, { header: true, skipEmptyLines: true });
-      if(!result.data || result.data.length < 2) throw new Error('Sheet sin datos');
+      const cols = result.meta && result.meta.fields ? result.meta.fields.join(', ') : 'sin columnas';
+      const rowCount = result.data ? result.data.length : 0;
+      setUploadStatus('CSV OK: ' + rowCount + ' filas. Cols: ' + cols.substring(0,60));
+      if(!result.data || result.data.length < 1) throw new Error('Sheet sin datos (0 filas)');
       processExcelRows(result.data, 'Google Sheets');
       showSyncTime();
     })
@@ -1619,7 +1623,12 @@ function syncFromSheets() {
       clearTimeout(timer);
       btn.classList.remove('syncing','loading');
       document.getElementById('syncIcon').textContent = '\u2601';
-      setUploadStatus(err.name==='AbortError' ? 'Tiempo agotado.' : 'Error: '+err.message, 'err');
+      const msg = err.name==='AbortError' ? 'Tiempo agotado (20s) - sin respuesta de Google'
+                                           : 'Error: ' + err.message;
+      setUploadStatus(msg, 'err');
+      // Mostrar en pantalla grande también
+      const dbg = document.getElementById('debugPanel');
+      if(dbg) dbg.innerHTML = '<b style="color:#f55">'+msg+'</b>';
     });
 }
 
