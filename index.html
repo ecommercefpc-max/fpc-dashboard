@@ -1602,9 +1602,7 @@ function syncFromSheets() {
   document.getElementById('syncIcon').textContent = '\u21BB';
   setUploadStatus('Conectando con Google Sheets\u2026');
 
-  const SHEET_ID = '1d4OZhsKmN8gaUMgbXfJiCsTkCTOV18Z_PQJ0truYtSI';
-  const csvUrl = 'https://docs.google.com/spreadsheets/d/' + SHEET_ID
-               + '/export?format=csv&sheet=LLENADO%201&t=' + Date.now();
+  const csvUrl = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRMF_mGi5zkqyQ5mGF7sUJLTcnF-XzxOEqGqrHk1PySPRmm_pKm7NvfI-TMtPSCnrFEg6PP7ph1w2Uf/pub?gid=1139767882&single=true&output=csv&t=' + Date.now();
 
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 20000);
