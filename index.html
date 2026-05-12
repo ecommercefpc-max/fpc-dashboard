@@ -482,8 +482,8 @@ td.hi { color: var(--teal); font-weight: 500; }
       <button class="upload-btn sheets-btn" id="syncBtn" onclick="syncFromSheets()">
         <span id="syncIcon">☁</span> Sincronizar Google Sheets
       </button>
-      <div class="upload-status" id="uploadStatus">Conectando...</div>
-      <div id="debugPanel" style="font-size:10px;color:#aaa;margin-top:4px;word-break:break-all"></div>
+      <div class="upload-status" id="uploadStatus">Iniciando...</div>
+      <div id="debugPanel" style="font-size:11px;color:#0f0;margin-top:6px;padding:6px;background:#000;border:1px solid #0a3;border-radius:4px;word-break:break-all;min-height:60px;font-family:monospace;">v4 cargando...</div>
       <div class="sheets-divider"><span>o</span></div>
       <input type="file" id="excelInput" accept=".xlsx,.xls" style="display:none">
       <input id="scriptUrlInput" style="display:none">
@@ -1597,38 +1597,56 @@ function toggleSetup() {
 
 function copyScriptCode() {}
 
+function dlog(msg) {
+  const d = document.getElementById('debugPanel');
+  if(d) d.innerHTML += '<br>' + new Date().toLocaleTimeString() + ': ' + msg;
+  console.log('[FPC]', msg);
+}
+
 function syncFromSheets() {
   const btn = document.getElementById('syncBtn');
   btn.classList.add('syncing','loading');
   document.getElementById('syncIcon').textContent = '\u21BB';
-  setUploadStatus('Conectando con Google Sheets\u2026');
+  setUploadStatus('Conectando...');
+  dlog('Iniciando sincronizacion');
 
   const csvUrl = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRMF_mGi5zkqyQ5mGF7sUJLTcnF-XzxOEqGqrHk1PySPRmm_pKm7NvfI-TMtPSCnrFEg6PP7ph1w2Uf/pub?gid=1139767882&single=true&output=csv&t=' + Date.now();
+  dlog('Fetch a: ' + csvUrl.substring(0, 80) + '...');
 
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 20000);
 
-  fetch(csvUrl, { signal: controller.signal })
-    .then(r => { clearTimeout(timer); if(!r.ok) throw new Error('HTTP '+r.status); return r.text(); })
+  fetch(csvUrl, { signal: controller.signal, mode: 'cors' })
+    .then(r => {
+      clearTimeout(timer);
+      dlog('Respuesta HTTP: ' + r.status + ' ' + r.statusText);
+      if(!r.ok) throw new Error('HTTP '+r.status);
+      return r.text();
+    })
     .then(csv => {
+      dlog('CSV recibido: ' + csv.length + ' chars');
+      dlog('Primeras letras: ' + csv.substring(0, 100));
       const result = Papa.parse(csv, { header: true, skipEmptyLines: true });
-      const cols = result.meta && result.meta.fields ? result.meta.fields.join(', ') : 'sin columnas';
-      const rowCount = result.data ? result.data.length : 0;
-      setUploadStatus('CSV OK: ' + rowCount + ' filas. Cols: ' + cols.substring(0,60));
-      if(!result.data || result.data.length < 1) throw new Error('Sheet sin datos (0 filas)');
-      processExcelRows(result.data, 'Google Sheets');
-      showSyncTime();
+      const fields = result.meta && result.meta.fields ? result.meta.fields : [];
+      dlog('Columnas detectadas (' + fields.length + '): ' + fields.join(' | '));
+      dlog('Filas parseadas: ' + (result.data ? result.data.length : 0));
+      if(!result.data || result.data.length < 1) throw new Error('Sheet sin datos');
+      try {
+        processExcelRows(result.data, 'Google Sheets');
+        dlog('processExcelRows completado OK');
+        showSyncTime();
+      } catch(pe) {
+        dlog('ERROR en processExcelRows: ' + pe.message);
+        throw pe;
+      }
     })
     .catch(err => {
       clearTimeout(timer);
       btn.classList.remove('syncing','loading');
       document.getElementById('syncIcon').textContent = '\u2601';
-      const msg = err.name==='AbortError' ? 'Tiempo agotado (20s) - sin respuesta de Google'
-                                           : 'Error: ' + err.message;
+      const msg = err.name==='AbortError' ? 'Tiempo agotado (20s)' : 'Error: ' + err.message;
       setUploadStatus(msg, 'err');
-      // Mostrar en pantalla grande también
-      const dbg = document.getElementById('debugPanel');
-      if(dbg) dbg.innerHTML = '<b style="color:#f55">'+msg+'</b>';
+      dlog('ERROR FINAL: ' + msg);
     });
 }
 
@@ -1705,6 +1723,7 @@ function handleGvizResponse_disabled(resp) {
 
 // Auto-sync al cargar
 window.addEventListener('load', () => {
+  document.getElementById('debugPanel').innerHTML = '<b style="color:#0f0">v4 cargado ' + new Date().toLocaleTimeString() + '</b>';
   loadScriptUrl();
   setTimeout(syncFromSheets, 800);
 });
