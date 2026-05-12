@@ -1599,29 +1599,34 @@ function copyScriptCode() {}
 function syncFromSheets() {
   const btn = document.getElementById('syncBtn');
   btn.classList.add('syncing','loading');
-  document.getElementById('syncIcon').textContent = '↻';
-  setUploadStatus('Conectando con Google Sheets…');
+  document.getElementById('syncIcon').textContent = '\u21BB';
+  setUploadStatus('Conectando con Google Sheets\u2026');
 
-  const isHttps = location.protocol === 'https:';
+  const SHEET_ID = '1d4OZhsKmN8gaUMgbXfJiCsTkCTOV18Z_PQJ0truYtSI';
+  const csvUrl = 'https://docs.google.com/spreadsheets/d/' + SHEET_ID
+               + '/export?format=csv&sheet=Form_Responses1&t=' + Date.now();
 
-  if(isHttps) {
-    // Desde https:// (GitHub Pages) → fetch directo, sin CORS
-    const url = 'https://docs.google.com/spreadsheets/d/1d4OZhsKmN8gaUMgbXfJiCsTkCTOV18Z_PQJ0truYtSI/gviz/tq?tqx=out:json&sheet=Form_Responses1&headers=1&t=' + Date.now();
-    fetch(url)
-      .then(r => r.text())
-      .then(text => {
-        // gviz devuelve: /*O_o*/
-google.visualization.Query.setResponse({...});
-        const json = JSON.parse(text.replace(/^[^{]*/, '').replace(/\);?\s*$/, ''));
-        handleGvizResponse(json);
-      })
-      .catch(err => syncViaJsonp()); // fallback a JSONP
-  } else {
-    syncViaJsonp(); // file:// → siempre JSONP
-  }
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 20000);
+
+  fetch(csvUrl, { signal: controller.signal })
+    .then(r => { clearTimeout(timer); if(!r.ok) throw new Error('HTTP '+r.status); return r.text(); })
+    .then(csv => {
+      const result = Papa.parse(csv, { header: true, skipEmptyLines: true });
+      if(!result.data || result.data.length < 2) throw new Error('Sheet sin datos');
+      processExcelRows(result.data, 'Google Sheets');
+      showSyncTime();
+    })
+    .catch(err => {
+      clearTimeout(timer);
+      btn.classList.remove('syncing','loading');
+      document.getElementById('syncIcon').textContent = '\u2601';
+      setUploadStatus(err.name==='AbortError' ? 'Tiempo agotado.' : 'Error: '+err.message, 'err');
+    });
 }
 
-function syncViaJsonp() {
+function _old_syncFromSheets_disabled() {
+function syncViaJsonp_disabled() {
   const btn = document.getElementById('syncBtn');
   const cbName = 'gviz_' + Date.now();
   const script  = document.createElement('script');
@@ -1653,7 +1658,7 @@ function syncViaJsonp() {
   document.head.appendChild(script);
 }
 
-function handleGvizResponse(resp) {
+function handleGvizResponse_disabled(resp) {
   const btn = document.getElementById('syncBtn');
   if(!resp || !resp.table) {
     btn.classList.remove('syncing','loading');
