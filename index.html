@@ -1604,7 +1604,7 @@ function syncFromSheets() {
 
   const SHEET_ID = '1d4OZhsKmN8gaUMgbXfJiCsTkCTOV18Z_PQJ0truYtSI';
   const csvUrl = 'https://docs.google.com/spreadsheets/d/' + SHEET_ID
-               + '/export?format=csv&sheet=Form_Responses1&t=' + Date.now();
+               + '/export?format=csv&sheet=LLENADO%201&t=' + Date.now();
 
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 20000);
@@ -1653,7 +1653,7 @@ function syncViaJsonp_disabled() {
 
   script.onerror = () => { clearTimeout(timer); fail('No se pudo conectar a Google Sheets'); };
   script.src = 'https://docs.google.com/spreadsheets/d/1d4OZhsKmN8gaUMgbXfJiCsTkCTOV18Z_PQJ0truYtSI'
-             + '/gviz/tq?sheet=Form_Responses1&headers=1&callback=' + cbName
+             + '/gviz/tq?sheet=LLENADO%201&headers=1&callback=' + cbName
              + '&headers=1&t=' + Date.now();
   document.head.appendChild(script);
 }
