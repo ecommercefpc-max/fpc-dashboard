@@ -482,8 +482,7 @@ td.hi { color: var(--teal); font-weight: 500; }
       <button class="upload-btn sheets-btn" id="syncBtn" onclick="syncFromSheets()">
         <span id="syncIcon">☁</span> Sincronizar Google Sheets
       </button>
-      <div class="upload-status" id="uploadStatus">Iniciando...</div>
-      <div id="debugPanel" style="font-size:11px;color:#0f0;margin-top:6px;padding:6px;background:#000;border:1px solid #0a3;border-radius:4px;word-break:break-all;min-height:60px;font-family:monospace;">v4 cargando...</div>
+      <div class="upload-status" id="uploadStatus">Conectando...</div>
       <div class="sheets-divider"><span>o</span></div>
       <input type="file" id="excelInput" accept=".xlsx,.xls" style="display:none">
       <input id="scriptUrlInput" style="display:none">
@@ -1597,136 +1596,49 @@ function toggleSetup() {
 
 function copyScriptCode() {}
 
-function dlog(msg) {
-  const d = document.getElementById('debugPanel');
-  if(d) d.innerHTML += '<br>' + new Date().toLocaleTimeString() + ': ' + msg;
-  console.log('[FPC]', msg);
+function loadScriptUrl() {
+  const saved = (localStorage.getItem('fpc_script_url') || '');
+  const el = document.getElementById('scriptUrlInput');
+  if(el && saved) el.value = saved;
+  return saved;
 }
+function saveScriptUrl() {}
+function toggleSetup() {}
+function copyScriptCode() {}
 
 function syncFromSheets() {
   const btn = document.getElementById('syncBtn');
+  const stat = document.getElementById('uploadStatus');
   btn.classList.add('syncing','loading');
   document.getElementById('syncIcon').textContent = '\u21BB';
-  setUploadStatus('Conectando...');
-  dlog('Iniciando sincronizacion');
+  stat.textContent = 'Conectando con Google...';
 
   const csvUrl = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRMF_mGi5zkqyQ5mGF7sUJLTcnF-XzxOEqGqrHk1PySPRmm_pKm7NvfI-TMtPSCnrFEg6PP7ph1w2Uf/pub?gid=1139767882&single=true&output=csv&t=' + Date.now();
-  dlog('Fetch a: ' + csvUrl.substring(0, 80) + '...');
 
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 20000);
-
-  fetch(csvUrl, { signal: controller.signal, mode: 'cors' })
-    .then(r => {
-      clearTimeout(timer);
-      dlog('Respuesta HTTP: ' + r.status + ' ' + r.statusText);
-      if(!r.ok) throw new Error('HTTP '+r.status);
+  fetch(csvUrl)
+    .then(function(r) {
+      if(!r.ok) throw new Error('HTTP ' + r.status);
       return r.text();
     })
-    .then(csv => {
-      dlog('CSV recibido: ' + csv.length + ' chars');
-      dlog('Primeras letras: ' + csv.substring(0, 100));
-      const result = Papa.parse(csv, { header: true, skipEmptyLines: true });
-      const fields = result.meta && result.meta.fields ? result.meta.fields : [];
-      dlog('Columnas detectadas (' + fields.length + '): ' + fields.join(' | '));
-      dlog('Filas parseadas: ' + (result.data ? result.data.length : 0));
-      if(!result.data || result.data.length < 1) throw new Error('Sheet sin datos');
-      try {
-        processExcelRows(result.data, 'Google Sheets');
-        dlog('processExcelRows completado OK');
-        showSyncTime();
-      } catch(pe) {
-        dlog('ERROR en processExcelRows: ' + pe.message);
-        throw pe;
-      }
+    .then(function(csv) {
+      var result = Papa.parse(csv, { header: true, skipEmptyLines: true });
+      if(!result.data || result.data.length < 1) throw new Error('Sheet vacio');
+      processExcelRows(result.data, 'Google Sheets');
+      showSyncTime();
     })
-    .catch(err => {
-      clearTimeout(timer);
+    .catch(function(err) {
       btn.classList.remove('syncing','loading');
       document.getElementById('syncIcon').textContent = '\u2601';
-      const msg = err.name==='AbortError' ? 'Tiempo agotado (20s)' : 'Error: ' + err.message;
-      setUploadStatus(msg, 'err');
-      dlog('ERROR FINAL: ' + msg);
+      stat.textContent = 'Error: ' + err.message;
+      stat.style.color = '#f55';
     });
 }
 
-function _old_syncFromSheets_disabled() {
-function syncViaJsonp_disabled() {
-  const btn = document.getElementById('syncBtn');
-  const cbName = 'gviz_' + Date.now();
-  const script  = document.createElement('script');
-  let done = false;
-
-  const fail = (msg) => {
-    if(done) return; done = true;
-    try { document.head.removeChild(script); } catch(e){}
-    delete window[cbName];
-    btn.classList.remove('syncing','loading');
-    document.getElementById('syncIcon').textContent = '☁';
-    setUploadStatus(msg, 'err');
-  };
-
-  const timer = setTimeout(() => fail('Sin respuesta de Google. Verifica conexión a internet.'), 15000);
-
-  window[cbName] = function(resp) {
-    if(done) return; done = true;
-    clearTimeout(timer);
-    try { document.head.removeChild(script); } catch(e){}
-    delete window[cbName];
-    handleGvizResponse(resp);
-  };
-
-  script.onerror = () => { clearTimeout(timer); fail('No se pudo conectar a Google Sheets'); };
-  script.src = 'https://docs.google.com/spreadsheets/d/1d4OZhsKmN8gaUMgbXfJiCsTkCTOV18Z_PQJ0truYtSI'
-             + '/gviz/tq?sheet=LLENADO%201&headers=1&callback=' + cbName
-             + '&headers=1&t=' + Date.now();
-  document.head.appendChild(script);
-}
-
-function handleGvizResponse_disabled(resp) {
-  const btn = document.getElementById('syncBtn');
-  if(!resp || !resp.table) {
-    btn.classList.remove('syncing','loading');
-    document.getElementById('syncIcon').textContent = '☁';
-    setUploadStatus('Respuesta inválida de Google', 'err');
-    return;
-  }
-  try {
-    const cols = resp.table.cols.map(c => c.label || c.id);
-    const rows = (resp.table.rows || [])
-      .filter(r => r && r.c)
-      .map(r => {
-        const obj = {};
-        r.c.forEach((cell, i) => {
-          obj[cols[i]] = (cell && cell.v != null)
-            ? (cell.f !== undefined ? cell.f : String(cell.v))
-            : '';
-        });
-        return obj;
-      })
-      .filter(r => Object.values(r).some(v => v !== ''));
-
-    if(rows.length < 2) {
-      btn.classList.remove('syncing','loading');
-      document.getElementById('syncIcon').textContent = '☁';
-      setUploadStatus('El sheet parece estar vacío', 'err');
-      return;
-    }
-    processExcelRows(rows, 'Google Sheets');
-    showSyncTime();
-  } catch(e) {
-    btn.classList.remove('syncing','loading');
-    document.getElementById('syncIcon').textContent = '☁';
-    setUploadStatus('Error: ' + e.message, 'err');
-  }
-}
-
-// Auto-sync al cargar
-window.addEventListener('load', () => {
-  document.getElementById('debugPanel').innerHTML = '<b style="color:#0f0">v4 cargado ' + new Date().toLocaleTimeString() + '</b>';
-  loadScriptUrl();
+window.addEventListener('load', function() {
   setTimeout(syncFromSheets, 800);
 });
+
+
 
 
 
